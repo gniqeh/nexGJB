@@ -1,0 +1,44 @@
+#http://www.ehu.eus/ccwintco/index.php?title=Hyperspectral_Remote_Sensing_Scenes#Salinas
+
+import numpy as numpy
+import pandas as pd
+
+import scipy.io as scio
+
+data_FilePath=r"X:\20210311\PaviaU.mat"
+gt_FilePath=r"X:\20210311\PaviaU_gt.mat"
+
+data = scio.loadmat(data_FilePath)
+gt = scio.loadmat(gt_FilePath)
+
+#>>>find out what the keys of pure data<<<#
+data = data["keys"]
+gt = gt["keys"]
+
+xi = data.shape[0]
+yi = data.shape[1]
+zi = data.shape[2]
+
+dataset = np.ones([xi*yi,zi+3])
+#dataset=[x, y, pure data, class] 
+
+k=0
+for x in range(xi):
+    for y in range(yi):
+        dataset[k] = [x,y]+list(temp[x][y])+[gt[x][y]]
+        k+=1
+dataset_saved = dataset.copy()
+dataset = np.delete(dataset,dataset[:,-1]==0,axis=0)
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(dataset[:,:-1], dataset[:,-1],
+                                                    test_size=0.66, random_state=615)
+
+from catboost import CatBoostClassifier
+from sklearn.metrics import accuracy_score
+model = CatBoostClassifier(task_type="GPU")
+model.fit(X_train[:,2:], y_train)
+y_test_pred = model.predict(X_test[:,2:])
+
+from sklearn.metrics import accuracy_score
+accuracy_score(y_test,y_test_pred)
