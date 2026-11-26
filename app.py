@@ -9,6 +9,7 @@ from shapely.geometry import shape, mapping
 from shapely.ops import transform
 from pyproj import Transformer
 from urllib.parse import quote
+from exporters import FORMATS, write_export
 ROOT=Path(__file__).resolve().parent
 LEVELS=('province','city','county')
 CRS={'WGS84':4326,'CGCS2000':4490,'L-EST97':3301}
@@ -38,7 +39,7 @@ def load():
             if l!=lev: continue
             p=f['properties']; g=shape(f['geometry']).simplify({'province':.025,'city':.012,'county':.005}[lev],preserve_topology=True)
             name=p[{'province':'province','city':'city','county':'county'}[lev]]
-            out.append({'type':'Feature','properties':{'key':id,'name':name,'province':p.get('province'),'city':p.get('city')},'geometry':mapping(g)})
+            out.append({'type':'Feature','properties':{'key':id,'name':name,'province':p.get('province'),'city':p.get('city'),'label':list(max(g.geoms,key=lambda x:x.area).representative_point().coords)[0] if g.geom_type=='MultiPolygon' else list(g.representative_point().coords)[0]},'geometry':mapping(g)})
         maps[lev]=json.dumps({'type':'FeatureCollection','features':out},ensure_ascii=False,separators=(',',':')).encode()
     print('已加载:',Counter(k[0] for k in features))
 
@@ -57,8 +58,10 @@ class Export(BaseModel):
     ids:list[str]
     target:str|None=None
     crs:str='WGS84'
+    format:str='geojson'
 
 def select(r):
+    if r.format not in FORMATS or (r.format=='kml' and r.crs!='WGS84'): raise HTTPException(400,'格式或坐标系不兼容')
     if r.level not in LEVELS or r.crs not in CRS or not r.ids: raise HTTPException(400,'参数无效')
     keys=list(dict.fromkeys((r.level,i) for i in r.ids))
     if any(k not in features for k in keys): raise HTTPException(400,'区域不存在')
@@ -87,7 +90,12 @@ def export(r:Export):
             item['geometry']=mapping(transform(lambda x,y,z=None:t.transform(x,y,errcheck=True),shape(f['geometry'])))
             item.pop('bbox',None)
         result['features'].append(item)
-    name=f'行政区划_{r.target or r.level}_{r.crs}_{len(chosen)}.geojson'
+    name=f'行政区划_{r.target or r.level}_{r.crs}_{len(chosen)}'
+    if r.format!='geojson':
+        try: content,ext,mime=write_export(result['features'],epsg,r.format)
+        except Exception as e: raise HTTPException(500,f'导出失败: {e}') from e
+        return Response(content,media_type=mime,headers={'Content-Disposition':"attachment; filename*=UTF-8''"+quote(name+ext)})
+    name+='.geojson'
     return Response(json.dumps(result,ensure_ascii=False,allow_nan=False,separators=(',',':')),media_type='application/geo+json',headers={'Content-Disposition':"attachment; filename*=UTF-8''"+quote(name)})
 
 app.mount('/static',StaticFiles(directory=ROOT/'static'),name='static')

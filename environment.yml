@@ -8,3 +8,6 @@ dependencies:
   - shapely>=2
   - pyproj
   - curl
+  - geopandas
+  - pyogrio
+  - pyarrow

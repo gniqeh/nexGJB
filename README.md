@@ -22,3 +22,8 @@ PORT=8812 bash start.sh
 地图使用独立简化几何，可能出现微小显示缝隙；下载保留原始精度和属性。数据更新后重启。大区域模式仅输出目标层级。WGS84 为标准 GeoJSON；CGCS2000 (4490) 与 L-EST97 (3301) 使用旧式 CRS 扩展。后者适用范围为爱沙尼亚，不应用于中国的距离与面积测算。
 
 访问 http://服务器IP:8812。仅部署于可信内网。可选 systemd：编辑 nexgjb.service.example 的用户、路径、环境管理器及端口后安装。未经真实全国数据和浏览器端到端验证。
+
+## v1.1
+地图工具栏新增“只看黑龙江”，仅显示黑龙江当前层级并自动定位；标签采用面内代表点、屏幕碰撞过滤，放大可显示更多名称。切换范围会确认清空已有选择。
+下载确认窗口支持 GeoJSON、GeoPackage、Shapefile ZIP、KML、GeoParquet、CSV+WKT、FlatGeobuf。KML 固定 WGS84；CSV 带 EPSG 字段；Shapefile 受 DBF 字段限制，完整属性建议使用 GeoPackage。
+升级后运行 bash install.sh 更新依赖，再重启 systemd 服务。无需修改端口或 Nginx。
