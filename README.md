@@ -27,3 +27,15 @@ PORT=8812 bash start.sh
 地图工具栏新增“只看黑龙江”，仅显示黑龙江当前层级并自动定位；标签采用面内代表点、屏幕碰撞过滤，放大可显示更多名称。切换范围会确认清空已有选择。
 下载确认窗口支持 GeoJSON、GeoPackage、Shapefile ZIP、KML、GeoParquet、CSV+WKT、FlatGeobuf。KML 固定 WGS84；CSV 带 EPSG 字段；Shapefile 受 DBF 字段限制，完整属性建议使用 GeoPackage。
 升级后运行 bash install.sh 更新依赖，再重启 systemd 服务。无需修改端口或 Nginx。
+
+## v1.2 后台使用日志
+不修改前端、不增加依赖、不使用数据库。首页 GET 访问和进入导出处理器的成功/失败事件经有界队列非阻塞投递，由独立线程写入 logs/visits/YYYY-MM.jsonl 和 logs/downloads/YYYY-MM.jsonl。按月分文件，永久保留，无自动清理。默认单 Uvicorn worker；日志故障、队列满、强制关机可能造成少量记录丢失，但不会阻止正常请求。正常停机最多等待三秒排空队列。成功生成不代表客户端已保存；框架在进入导出处理器前拒绝的非法请求不计入。IP 使用 ASGI client 地址，独立 IP 不等于人数。日志包含 IP、浏览器 User-Agent（访问）和下载选择信息，请限制管理员访问并按院内要求告知使用者。新目录权限 0700、文件 0600；备份日志并监控磁盘空间。日志不进入 Git。
+
+```bash
+python3 stats.py --all
+python3 stats.py --today
+python3 stats.py --month 2026-11
+python3 stats.py --year 2026
+```
+
+仅需拉取代码并重启 nexgjb 服务，不需要再次安装环境。统计脚本只使用 Python 标准库，可在服务运行时读取日志。

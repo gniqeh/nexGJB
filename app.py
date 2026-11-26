@@ -1,7 +1,8 @@
 import json, os, copy
 from pathlib import Path
 from collections import Counter
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+import usage
 from fastapi.responses import Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -46,6 +47,11 @@ def load():
 @app.on_event('startup')
 def startup():
     features.clear(); maps.clear(); load()
+    usage.start()
+
+@app.on_event('shutdown')
+def shutdown():
+    usage.stop()
 
 @app.get('/api/map/{level}')
 def map_data(level:str):
@@ -76,8 +82,22 @@ def preview(r:Export):
     return {'count':len(select(r))}
 
 @app.post('/api/export')
-def export(r:Export):
-    chosen=select(r)
+def export(r:Export, request:Request):
+    count=0
+    try:
+        chosen=select(r)
+        count=len(chosen)
+        response=build_export(r,chosen)
+    except HTTPException as exc:
+        usage.download(request,r,features,count,0,'failed',exc.status_code)
+        raise
+    except Exception:
+        usage.download(request,r,features,count,0,'failed',500)
+        raise
+    usage.download(request,r,features,count,len(response.body),'generated',response.status_code)
+    return response
+
+def build_export(r,chosen):
     if not chosen: raise HTTPException(400,'没有符合条件的行政区')
     result={'type':'FeatureCollection','features':[]}
     epsg=CRS[r.crs]
@@ -100,4 +120,7 @@ def export(r:Export):
 
 app.mount('/static',StaticFiles(directory=ROOT/'static'),name='static')
 @app.get('/')
-def index(): return FileResponse(ROOT/'static/index.html')
+def index(request:Request):
+    response=FileResponse(ROOT/'static/index.html')
+    usage.visit(request)
+    return response
