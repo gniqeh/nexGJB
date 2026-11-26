@@ -1,0 +1,15 @@
+[Unit]
+Description=nexGJB - Next Generation GeoJSON Boundary
+After=network.target
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/path/to/nexGJB
+Environment=PORT=8812
+Environment=PATH=/path/to/environment-manager/bin:/usr/local/bin:/usr/bin:/bin
+# 若使用 micromamba，请按实际安装设置 MAMBA_ROOT_PREFIX
+ExecStart=/bin/bash /path/to/nexGJB/start.sh
+Restart=on-failure
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
